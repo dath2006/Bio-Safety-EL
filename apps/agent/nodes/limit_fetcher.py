@@ -104,9 +104,9 @@ async def limit_fetcher(
             ])
             limits = _parse_limits_json(response.content)
         except Exception:
-            limits = _fallback_limits(ccps)
+            limits = _fallback_limits(ccps, product_category)
     else:
-        limits = _fallback_limits(ccps)
+        limits = _fallback_limits(ccps, product_category)
 
     # Normalize limits and mark user_validated as False
     normalized_limits: Dict[str, dict] = {}
@@ -162,7 +162,7 @@ def _parse_limits_json(content: str) -> Dict[str, dict]:
     return {}
 
 
-def _fallback_limits(ccps: list) -> Dict[str, dict]:
+def _fallback_limits(ccps: list, product_category: str = "general") -> Dict[str, dict]:
     """Generate default critical limits based on FSSAI guidelines when LLM is unavailable."""
     limits = {}
     for ccp in ccps:
@@ -184,6 +184,38 @@ def _fallback_limits(ccps: list) -> Dict[str, dict]:
                 "max_value": None,
                 "unit": "°C",
                 "source_citation": "FSSAI Schedule 4 Part IV Sec 3.1.2 (Core product temperature standards)"
+            }
+        elif "chill" in step_lower and product_category in ["meat", "seafood"]:
+            limits[ccp_key] = {
+                "parameter": "Carcass Chilling Temperature",
+                "min_value": -1.0,
+                "max_value": 4.0,
+                "unit": "°C",
+                "source_citation": "FSSAI Schedule 4 Part II Sec 4.1.5 (Slaughterhouse chilling standards)"
+            }
+        elif "freez" in step_lower or "blast" in step_lower:
+            limits[ccp_key] = {
+                "parameter": "Freezer Temperature",
+                "min_value": None,
+                "max_value": -18.0,
+                "unit": "°C",
+                "source_citation": "FSSAI Schedule 4 Part V (Cold Chain & Storage)"
+            }
+        elif "hot hold" in step_lower or "display" in step_lower:
+            limits[ccp_key] = {
+                "parameter": "Hot Holding Temperature",
+                "min_value": 65.0,
+                "max_value": None,
+                "unit": "°C",
+                "source_citation": "FSSAI Schedule 4 Part VI (Catering & Food Service)"
+            }
+        elif "metal" in step_lower or "detect" in step_lower:
+            limits[ccp_key] = {
+                "parameter": "Metal Detection Limit",
+                "min_value": None,
+                "max_value": 2.5,
+                "unit": "mm (Ferrous)",
+                "source_citation": "Codex GMP Physical Hazard Limits"
             }
         elif "cool" in step_lower or "refrigerat" in step_lower or "storage" in step_lower:
             limits[ccp_key] = {

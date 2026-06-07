@@ -857,6 +857,93 @@ async def delete_document(filename: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
 
 
+
+@app.post("/api/regulatory/check")
+async def trigger_regulatory_check(db: AsyncSession = Depends(get_db)):
+    """
+    On-demand: run the regulatory monitoring agent across all active plans.
+    Searches FSSAI and Codex sources for updates and generates ComplianceAlert records.
+    """
+    from db.models import HACCPPlan
+    from graphs.reg_monitor import run_regulatory_monitor
+    from db.persistence import load_plan_state
+
+    query = select(HACCPPlan).where(
+        HACCPPlan.status.in_(["in_progress", "complete"])
+    )
+    res = await db.execute(query)
+    plans = res.scalars().all()
+
+    total_alerts = 0
+    scanned = 0
+    errors = []
+
+    for plan in plans:
+        try:
+            plan_state = await load_plan_state(db, str(plan.id))
+            plan_sections: list[str] = []
+            if plan_state:
+                hazards = plan_state.get("hazards_identified", [])
+                ccps = plan_state.get("ccps_approved", [])
+                if hazards:
+                    plan_sections.append(f"Hazards: {len(hazards)} identified")
+                if ccps:
+                    plan_sections.append(f"CCPs: {', '.join(c.get('process_step', '') for c in ccps[:3])}")
+
+            alert_dicts = await run_regulatory_monitor(
+                plan_id=str(plan.id),
+                business_name=plan.business_name or "",
+                product_category=plan.product_category or "general",
+                plan_sections=plan_sections,
+            )
+
+            for alert_data in alert_dicts:
+                from db.models import ComplianceAlert
+                alert = ComplianceAlert(
+                    regulatory_source=alert_data.get("regulatory_source", "FSSAI"),
+                    change_summary=alert_data.get("change_summary", ""),
+                    affected_sections=alert_data.get("affected_sections", []),
+                    status="active",
+                )
+                db.add(alert)
+                total_alerts += 1
+
+            await db.commit()
+            scanned += 1
+        except Exception as exc:
+            errors.append({"plan_id": str(plan.id), "error": str(exc)})
+
+    return {
+        "status": "complete",
+        "plans_scanned": scanned,
+        "alerts_created": total_alerts,
+        "errors": errors,
+    }
+
+
+@app.get("/api/compliance/alerts")
+async def get_global_compliance_alerts(db: AsyncSession = Depends(get_db)):
+    """Return the global feed of all regulatory compliance alerts."""
+    from db.models import ComplianceAlert
+    query = select(ComplianceAlert).order_by(ComplianceAlert.created_at.desc()).limit(50)
+    res = await db.execute(query)
+    alerts = res.scalars().all()
+
+    return {
+        "alerts": [
+            {
+                "id": str(a.id),
+                "regulatory_source": a.regulatory_source,
+                "change_summary": a.change_summary,
+                "affected_sections": a.affected_sections,
+                "status": a.status,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in alerts
+        ]
+    }
+
+
 if __name__ == "__main__":
     import os
     import uvicorn

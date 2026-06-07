@@ -134,8 +134,10 @@ def generate_haccp_pdf(state: dict) -> bytes:
     business_name = state.get("business_name") or "Unnamed Facility"
     category = state.get("product_category") or "General Food Category"
     plan_id = state.get("plan_id") or "N/A"
+    fssai_license = state.get("fssai_license_number") or "Not Provided"
     
     story.append(Paragraph(f"<b>Food Business Operator:</b> {business_name}", meta_style))
+    story.append(Paragraph(f"<b>FSSAI License No:</b> {fssai_license}", meta_style))
     story.append(Paragraph(f"<b>Product Category:</b> {category}", meta_style))
     story.append(Paragraph(f"<b>Plan ID:</b> {plan_id}", meta_style))
     story.append(Paragraph(f"<b>Generated Date:</b> {datetime.now().strftime('%B %d, %Y')}", meta_style))
@@ -360,28 +362,73 @@ def generate_haccp_pdf(state: dict) -> bytes:
     
     v_schedule = state.get("verification_schedule") or {}
     if v_schedule:
-        v_data = []
+        v_data = [
+            [Paragraph("Verification Activity", table_header_style), Paragraph("Schedule / Frequency", table_header_style)]
+        ]
         for key, val in v_schedule.items():
-            title = key.replace("_", " ").capitalize()
+            title = key.replace("_", " ").title()
             v_data.append([
                 Paragraph(f"<b>{title}</b>", table_cell_style),
                 Paragraph(str(val), table_cell_style)
             ])
             
-        t = Table(v_data, colWidths=[130, 370])
+        t = Table(v_data, colWidths=[150, 350])
         t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), primary_color),
             ('GRID', (0,0), (-1,-1), 0.5, border_color),
-            ('BACKGROUND', (0,0), (0,-1), bg_light),
             ('VALIGN', (0,0), (-1,-1), 'TOP'),
             ('BOTTOMPADDING', (0,0), (-1,-1), 6),
             ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, bg_light]),
         ]))
         story.append(t)
     else:
         story.append(Paragraph("No verification schedule defined.", body_style))
+        
+    story.append(Spacer(1, 30))
+
+    # 7. APPENDIX: RECORD TEMPLATES
+    records = state.get("records_generated", [])
+    if records:
+        story.append(Paragraph("Appendix A: Required FSMS Records", h1_style))
+        story.append(Paragraph(
+            "The following records must be maintained to demonstrate compliance with this HACCP plan:",
+            body_style
+        ))
+        
+        record_list = []
+        for r in records:
+            record_list.append([Paragraph(f"• {r}", table_cell_style)])
+            
+        t = Table(record_list, colWidths=[500])
+        t.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+            ('TOPPADDING', (0,0), (-1,-1), 3),
+        ]))
+        story.append(t)
+        
+    story.append(Spacer(1, 50))
+    
+    # 8. SIGNATURE BLOCK
+    story.append(KeepTogether([
+        Paragraph("Approval Signatures", h1_style),
+        Paragraph("By signing below, the undersigned acknowledge that this HACCP plan has been reviewed, validated, and approved for implementation.", body_style),
+        Spacer(1, 30),
+        Table([
+            [Paragraph("________________________________", table_cell_style), Paragraph("________________________________", table_cell_style)],
+            [Paragraph("<b>Food Safety Team Leader / QA Manager</b>", table_cell_style), Paragraph("<b>Facility Director / Plant Manager</b>", table_cell_style)],
+            [Paragraph("Name:", table_cell_style), Paragraph("Name:", table_cell_style)],
+            [Paragraph("Date:", table_cell_style), Paragraph("Date:", table_cell_style)],
+        ], colWidths=[250, 250], style=TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ]))
+    ]))
         
     # Build Document
     doc.build(story)
     pdf_bytes = buffer.getvalue()
     buffer.close()
     return pdf_bytes
+

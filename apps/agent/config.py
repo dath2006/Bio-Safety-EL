@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     langchain_api_key: str = ""
     langchain_project: str = "haccp-ai-system"
 
+    # Redis / Celery
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Tavily (optional — for regulatory web search)
+    tavily_api_key: str = ""
+
     # Server
     agent_host: str = "0.0.0.0"
     agent_port: int = 8000
