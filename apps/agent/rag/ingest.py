@@ -112,6 +112,49 @@ DOCUMENT_REGISTRY: list[dict] = [
             "spices", "street_food", "cold_chain",
         ],
     },
+    # ── Phase 4 new documents ───────────────────────────────────────────
+    {
+        "file": "fssai_schedule4_part2_slaughterhouses.md",
+        "source_body": "FSSAI",
+        "document_title": "FSSAI Schedule 4 Part II — Slaughterhouses and Meat Processing",
+        "amendment_date": "2024-01-15",
+        "product_categories": ["meat", "seafood"],
+    },
+    {
+        "file": "fssai_schedule4_part3_street_vendors.md",
+        "source_body": "FSSAI",
+        "document_title": "FSSAI Schedule 4 Part III — Street Food Vendors and Small Food Businesses",
+        "amendment_date": "2023-08-01",
+        "product_categories": ["street_food", "catering"],
+    },
+    {
+        "file": "fssai_schedule4_part5_storage_transport.md",
+        "source_body": "FSSAI",
+        "document_title": "FSSAI Schedule 4 Part V — Cold Chain, Storage, and Transportation",
+        "amendment_date": "2024-03-01",
+        "product_categories": ["cold_chain", "dairy", "meat", "seafood", "rte"],
+    },
+    {
+        "file": "fssai_product_standards_rte.md",
+        "source_body": "FSSAI",
+        "document_title": "FSSAI Product Standards for Ready-to-Eat (RTE) Meals and Processed Foods",
+        "amendment_date": "2023-11-15",
+        "product_categories": ["rte", "catering"],
+    },
+    {
+        "file": "icmr_meat_microbiological_standards.md",
+        "source_body": "ICMR",
+        "document_title": "ICMR and FSSAI Microbiological Standards for Meat, Poultry, and Seafood",
+        "amendment_date": "2023-06-01",
+        "product_categories": ["meat", "seafood"],
+    },
+    {
+        "file": "fssai_schedule4_part6_catering.md",
+        "source_body": "FSSAI",
+        "document_title": "FSSAI Schedule 4 Part VI — Catering Establishments and Food Service Operations",
+        "amendment_date": "2024-01-01",
+        "product_categories": ["catering", "rte"],
+    },
 ]
 
 

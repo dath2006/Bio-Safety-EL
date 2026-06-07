@@ -297,8 +297,18 @@ function PlanBuilder() {
 
         {/* Stage content */}
         {!state ? (
-          /* No active plan — show intake form */
-          <IntakeForm onStart={start} loading={loading} />
+          loading ? (
+            <div className="space-y-6 animate-in fade-in max-w-2xl">
+              <div className="space-y-2">
+                <div className="h-6 w-1/3 bg-muted rounded animate-pulse" />
+                <div className="h-4 w-2/3 bg-muted rounded animate-pulse" />
+              </div>
+              <div className="h-40 w-full bg-muted/50 rounded-xl animate-pulse" />
+              <div className="h-64 w-full bg-muted/50 rounded-xl animate-pulse" />
+            </div>
+          ) : (
+            <IntakeForm onStart={start} loading={loading} />
+          )
         ) : loading && isAutoStage ? (
           <AutoProcessingPanel stage={state.current_stage} />
         ) : state.current_stage === "hazard_analyzer" ? (

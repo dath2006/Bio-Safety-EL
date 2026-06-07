@@ -306,4 +306,59 @@ export const api = {
   listPlansLocal() {
     return mock.mockListPlans();
   },
+
+  async regulatoryCheck(): Promise<{
+    status: string;
+    plans_scanned: number;
+    alerts_created: number;
+    errors: { plan_id: string; error: string }[];
+  }> {
+    if (USE_MOCK) {
+      await new Promise((r) => setTimeout(r, 2000));
+      return {
+        status: "complete",
+        plans_scanned: 2,
+        alerts_created: 1,
+        errors: [],
+      };
+    }
+    return req("/api/regulatory/check", { method: "POST" });
+  },
+
+  async complianceAlertsFeed(): Promise<{
+    alerts: Array<{
+      id: string;
+      regulatory_source: string;
+      change_summary: string;
+      affected_sections: string[];
+      status: string;
+      created_at: string | null;
+    }>;
+  }> {
+    if (USE_MOCK) {
+      return {
+        alerts: [
+          {
+            id: "alert-001",
+            regulatory_source: "FSSAI",
+            change_summary:
+              "FSSAI has revised the microbiological standards for pasteurized dairy products. New TPC limits: ≤30,000 CFU/mL (previously ≤50,000). E. coli must now be absent in 1 mL (previously 0.1 mL).",
+            affected_sections: ["Critical Limits", "Monitoring Procedures"],
+            status: "active",
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: "alert-002",
+            regulatory_source: "Codex",
+            change_summary:
+              "Codex Alimentarius updated CXC 1-1969 Annex II on allergen management requirements. Food businesses must now include sesame in the list of major allergens requiring declaration.",
+            affected_sections: ["Hazard Analysis", "Record Keeping"],
+            status: "active",
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+          },
+        ],
+      };
+    }
+    return req("/api/compliance/alerts");
+  },
 };

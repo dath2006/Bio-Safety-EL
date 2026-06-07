@@ -102,6 +102,57 @@ RETRIEVAL_TEST_QUERIES = [
         "expected_keywords": ["staphyloc", "toxin", "heat"],
         "hazard_type": "biological",
     },
+    # Phase 4 new queries
+    {
+        "query": "What are the chilling requirements for meat carcasses in slaughterhouses?",
+        "expected_keywords": ["chill", "carcass", "meat", "temperature", "slaughter"],
+        "product_category": "meat",
+    },
+    {
+        "query": "Street food vendor personal hygiene and water quality standards",
+        "expected_keywords": ["street", "vendor", "hygiene", "water", "potable"],
+        "product_category": "street_food",
+    },
+    {
+        "query": "Cold chain transportation vehicle temperature monitoring",
+        "expected_keywords": ["transport", "vehicle", "temperature", "cold chain"],
+        "product_category": "cold_chain",
+    },
+    {
+        "query": "Ready-to-eat (RTE) meals microbiological limits for Listeria and Salmonella",
+        "expected_keywords": ["rte", "listeria", "salmonella", "microbiological"],
+        "product_category": "rte",
+    },
+    {
+        "query": "Catering and food service hot holding temperature limit",
+        "expected_keywords": ["hot", "holding", "catering", "temperature", "service"],
+        "product_category": "catering",
+    },
+    {
+        "query": "ICMR meat and poultry microbiological standards E. coli limits",
+        "expected_keywords": ["meat", "poultry", "e. coli", "microbiological", "limit"],
+        "source_body": "ICMR",
+    },
+    {
+        "query": "FSSAI blast freezing requirements for seafood and meat",
+        "expected_keywords": ["blast", "freez", "seafood", "meat", "storage"],
+        "product_category": "cold_chain",
+    },
+    {
+        "query": "Cross-contamination prevention between raw meat and cooked RTE food",
+        "expected_keywords": ["cross", "contamin", "raw", "cooked", "separate"],
+        "product_category": "catering",
+    },
+    {
+        "query": "Food handler medical fitness certificates and vaccination requirements",
+        "expected_keywords": ["medical", "fitness", "vaccin", "handler"],
+        "source_body": "FSSAI",
+    },
+    {
+        "query": "High-risk foods storage temperature danger zone limits",
+        "expected_keywords": ["danger", "zone", "temperature", "high-risk", "storage"],
+        "product_category": "general",
+    },
 ]
 
 

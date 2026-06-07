@@ -11,7 +11,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, CheckCircle2, Plus, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  Loader2,
+  Download,
+  Activity,
+  ThermometerSun,
+} from "lucide-react";
 import { api } from "@/lib/haccp/api";
 import type { MonitoringLog } from "@/lib/haccp/types";
 import { Button } from "@/components/ui/button";
@@ -62,7 +70,6 @@ function MonitorPage() {
   // 2. Fetch plan state (CCPs) and logs when planId changes
   useEffect(() => {
     if (!planId) return;
-
     async function loadPlanData() {
       setLoading(true);
       try {
@@ -84,7 +91,6 @@ function MonitorPage() {
         } else {
           setSelected(null);
         }
-
         const logsRes = await api.getLogs(planId);
         setLogs(logsRes.logs);
       } catch (e) {
@@ -93,7 +99,6 @@ function MonitorPage() {
         setLoading(false);
       }
     }
-
     loadPlanData();
   }, [planId]);
 
@@ -129,6 +134,23 @@ function MonitorPage() {
     }
   }
 
+  function exportCsv() {
+    const header = "CCP Hazard,Parameter,Value,Unit,Timestamp,Deviation\n";
+    const rows = logs
+      .map(
+        (l) =>
+          `"${l.ccp_hazard}","${l.parameter}",${l.value},"${l.unit ?? ""}","${l.timestamp}",${l.is_deviation}`,
+      )
+      .join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ccp_monitoring_${planId}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const chartData = useMemo(
     () =>
       logs
@@ -142,6 +164,20 @@ function MonitorPage() {
         })),
     [logs, selected],
   );
+
+  // Per-CCP status summary
+  const ccpStatus = useMemo(() => {
+    return ccps.map((c) => {
+      const ccpLogs = [...logs].filter((l) => l.ccp_hazard === c.hazard);
+      const last = ccpLogs[ccpLogs.length - 1];
+      return {
+        ...c,
+        isDeviating: last?.is_deviation ?? false,
+        lastValue: last ? `${last.value} ${c.unit}` : "—",
+        readingCount: ccpLogs.length,
+      };
+    });
+  }, [ccps, logs]);
 
   if (loading && plans.length === 0) {
     return (
@@ -163,37 +199,31 @@ function MonitorPage() {
     );
   }
 
-  if (planId && ccps.length === 0 && !loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4 bg-card p-4 rounded-xl border border-border">
-          <label className="text-sm font-medium">Select Plan:</label>
-          <Select value={planId} onValueChange={setPlanId}>
-            <SelectTrigger className="w-64 bg-background border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {plans.map((p) => (
-                <SelectItem key={p.plan_id} value={p.plan_id}>
-                  {p.business_name} ({p.product_category})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="h-[300px] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border border-border">
-          <CheckCircle2 className="h-12 w-12 text-success mb-4" />
-          <h3 className="font-semibold text-lg">No CCPs defined for this plan</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mt-1">
-            This plan does not have any approved Critical Control Points.
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-teal-500 bg-clip-text text-transparent">
+            CCP Monitoring Dashboard
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Real-time operational tracking for each Critical Control Point.
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={logs.length === 0}
+          className="gap-2 cursor-pointer"
+          id="export-csv-btn"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
-    );
-  }
 
-  return (
-    <div className="space-y-6">
       {/* Plan Selector */}
       <div className="flex items-center gap-4 bg-card p-4 rounded-xl border border-border">
         <label className="text-sm font-medium text-muted-foreground">Active Plan:</label>
@@ -209,81 +239,134 @@ function MonitorPage() {
             ))}
           </SelectContent>
         </Select>
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {ccps.map((c) => {
-          const last = [...logs]
-            .reverse()
-            .find((l) => l.ccp_hazard === c.hazard);
-          const deviating = last?.is_deviation ?? false;
-          return (
-            <button
-              key={c.hazard}
-              onClick={() => setSelected(c)}
-              className={cn(
-                "text-left rounded-xl border bg-card p-5 transition cursor-pointer",
-                selected && selected.hazard === c.hazard
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "border-border hover:border-primary/40",
-              )}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="text-xs text-muted-foreground">
-                    {c.parameter}
+      {/* Multi-CCP Overview Summary */}
+      {ccpStatus.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="h-4 w-4 text-primary" />
+            <h3 className="font-semibold text-sm">All CCPs at a Glance</h3>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {ccpStatus.filter((c) => c.isDeviating).length} deviating ·{" "}
+              {ccpStatus.filter((c) => !c.isDeviating).length} in control
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ccpStatus.map((c) => (
+              <button
+                key={c.hazard}
+                onClick={() => setSelected(c)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer",
+                  c.isDeviating
+                    ? "border-destructive/40 bg-destructive/5 text-destructive"
+                    : "border-success/30 bg-success/5 text-success",
+                  selected?.hazard === c.hazard && "ring-2 ring-primary/30",
+                )}
+              >
+                {c.isDeviating ? (
+                  <AlertTriangle className="h-3 w-3 animate-pulse" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3" />
+                )}
+                {c.hazard.split(" - ")[0]}
+                <span className="text-muted-foreground font-normal ml-1">
+                  {c.lastValue}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {planId && ccps.length === 0 && !loading && (
+        <div className="h-[200px] flex flex-col items-center justify-center text-center p-6 bg-card rounded-xl border border-border">
+          <CheckCircle2 className="h-10 w-10 text-muted-foreground mb-3 opacity-40" />
+          <h3 className="font-semibold">No CCPs defined for this plan</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mt-1">
+            This plan does not have any approved Critical Control Points.
+          </p>
+        </div>
+      )}
+
+      {/* CCP Cards */}
+      {ccps.length > 0 && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {ccpStatus.map((c) => {
+            const deviating = c.isDeviating;
+            return (
+              <button
+                key={c.hazard}
+                onClick={() => setSelected(c)}
+                className={cn(
+                  "text-left rounded-xl border bg-card p-5 transition-all cursor-pointer",
+                  selected && selected.hazard === c.hazard
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "border-border hover:border-primary/40",
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-xs text-muted-foreground">{c.parameter}</div>
+                    <div className="font-semibold mt-1 text-sm">{c.hazard}</div>
                   </div>
-                  <div className="font-semibold mt-1 text-sm">{c.hazard}</div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border",
+                      deviating
+                        ? "bg-destructive/15 text-destructive border-destructive/30 animate-pulse"
+                        : "bg-success/15 text-success border-success/30",
+                    )}
+                  >
+                    {deviating ? (
+                      <AlertTriangle className="h-3 w-3" />
+                    ) : (
+                      <CheckCircle2 className="h-3 w-3" />
+                    )}
+                    {deviating ? "Deviation" : "In control"}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border",
-                    deviating
-                      ? "bg-destructive/15 text-destructive border-destructive/30 animate-pulse"
-                      : "bg-success/15 text-success border-success/30",
-                  )}
-                >
-                  {deviating ? (
-                    <AlertTriangle className="h-3 w-3" />
-                  ) : (
-                    <CheckCircle2 className="h-3 w-3" />
-                  )}
-                  {deviating ? "Deviation" : "In control"}
-                </span>
-              </div>
-              <div className="mt-3 text-sm">
-                Last value:{" "}
-                <span className="font-medium">
-                  {last ? `${last.value} ${c.unit}` : "—"}
-                </span>
-                <span className="ml-3 text-muted-foreground text-xs">
-                  Limit: {c.min != null ? `≥ ${c.min}` : ""}
-                  {c.max != null ? `≤ ${c.max}` : ""} {c.unit}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+                <div className="mt-3 text-sm flex items-center gap-3 flex-wrap">
+                  <span>
+                    Last:{" "}
+                    <span className="font-medium">{c.lastValue}</span>
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    Limit: {c.min != null ? `≥ ${c.min}` : ""}
+                    {c.max != null ? ` ≤ ${c.max}` : ""} {c.unit}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {c.readingCount} readings
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {selected && (
         <div className="grid lg:grid-cols-[1fr_320px] gap-6">
+          {/* Trend Chart */}
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-semibold">{selected.parameter} trend</h3>
-                <p className="text-xs text-muted-foreground">
-                  {selected.hazard}
-                </p>
+                <h3 className="font-semibold flex items-center gap-2">
+                  <ThermometerSun className="h-4 w-4 text-primary" />
+                  {selected.parameter} trend
+                </h3>
+                <p className="text-xs text-muted-foreground">{selected.hazard}</p>
               </div>
+              {chartData.length === 0 && (
+                <span className="text-xs text-muted-foreground">No readings yet</span>
+              )}
             </div>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="var(--color-border)"
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="time" stroke="var(--color-muted-foreground)" />
                   <YAxis stroke="var(--color-muted-foreground)" />
                   <Tooltip />
@@ -319,6 +402,7 @@ function MonitorPage() {
                     stroke="var(--color-primary)"
                     strokeWidth={2}
                     dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -326,6 +410,7 @@ function MonitorPage() {
           </div>
 
           <div className="space-y-4">
+            {/* Record Measurement */}
             <form
               onSubmit={submit}
               className="rounded-xl border border-border bg-card p-5 space-y-3"
@@ -343,8 +428,10 @@ function MonitorPage() {
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="e.g. 73.5"
                 required
+                id="ccp-value-input"
               />
-              <Button type="submit" disabled={busy} className="w-full">
+              <Button type="submit" disabled={busy} className="w-full" id="submit-reading-btn">
+                {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 Submit reading
               </Button>
             </form>
@@ -366,6 +453,7 @@ function MonitorPage() {
               </div>
             )}
 
+            {/* Recent Logs */}
             <div className="rounded-xl border border-border bg-card p-5">
               <h3 className="font-semibold mb-3">Recent logs</h3>
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1 text-xs">
@@ -392,9 +480,15 @@ function MonitorPage() {
                         )}
                       >
                         {l.value} {l.unit ?? ""}
+                        {l.is_deviation && (
+                          <AlertTriangle className="h-3 w-3 inline ml-1" />
+                        )}
                       </span>
                     </div>
                   ))}
+                {logs.length === 0 && (
+                  <p className="text-muted-foreground text-center py-4">No readings recorded yet.</p>
+                )}
               </div>
             </div>
           </div>

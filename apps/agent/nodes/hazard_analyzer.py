@@ -96,14 +96,14 @@ Identify all significant hazards for each process step. Return a JSON array."""
             analysis_message = response.content
             hazards = _parse_hazards_json(analysis_message)
         except Exception as exc:
-            hazards = _fallback_hazard_extraction(all_chunks, process_steps)
+            hazards = _fallback_hazard_extraction(all_chunks, process_steps, product_category)
             analysis_message = (
                 f"LLM call failed ({exc}). Using RAG-based hazard extraction.\n\n"
                 f"Identified {len(hazards)} hazards from regulatory documents."
             )
     else:
         # Fallback: rule-based hazard extraction from RAG chunks when no API key
-        hazards = _fallback_hazard_extraction(all_chunks, process_steps)
+        hazards = _fallback_hazard_extraction(all_chunks, process_steps, product_category)
         analysis_message = (
             "Hazard analysis completed using RAG retrieval (LLM unavailable — "
             "set OPENROUTER_API_KEY for full AI reasoning).\n\n"
@@ -161,13 +161,15 @@ def _parse_hazards_json(content: str) -> list[dict]:
     return []
 
 
-def _fallback_hazard_extraction(chunks, process_steps: list[str]) -> list[dict]:
+def _fallback_hazard_extraction(chunks, process_steps: list[str], product_category: str = "general") -> list[dict]:
     """Extract hazards from RAG chunks without LLM."""
     hazards: list[dict] = []
+    
+    # Expanded keywords for Phase 4 multi-product support
     hazard_keywords = {
-        "biological": ["pathogen", "bacteria", "microbial", "salmonella", "listeria", "e. coli", "bacillus"],
-        "chemical": ["aflatoxin", "pesticide", "residue", "detergent", "chemical"],
-        "physical": ["metal", "glass", "foreign", "physical", "fragment"],
+        "biological": ["pathogen", "bacteria", "microbial", "salmonella", "listeria", "e. coli", "bacillus", "coliform", "staphylococcus"],
+        "chemical": ["aflatoxin", "pesticide", "residue", "detergent", "chemical", "antibiotic", "heavy metal", "additive"],
+        "physical": ["metal", "glass", "foreign", "physical", "fragment", "bone", "plastic"],
     }
 
     for chunk in chunks:
@@ -175,8 +177,22 @@ def _fallback_hazard_extraction(chunks, process_steps: list[str]) -> list[dict]:
         for category, keywords in hazard_keywords.items():
             if any(kw in text_lower for kw in keywords):
                 step = process_steps[0] if process_steps else "General"
+                
+                # Context-aware step matching
                 if "pasteur" in text_lower:
                     step = next((s for s in process_steps if "pasteur" in s.lower()), step)
+                elif "cook" in text_lower or "heat" in text_lower:
+                    step = next((s for s in process_steps if "cook" in s.lower() or "heat" in s.lower()), step)
+                elif "chill" in text_lower or "freez" in text_lower or "cold" in text_lower:
+                    step = next((s for s in process_steps if "chill" in s.lower() or "freez" in s.lower() or "stor" in s.lower()), step)
+
+                # Tailor severity by product category
+                severity = 3
+                if category == "biological":
+                    if product_category in ["meat", "seafood", "rte", "dairy_pasteurized"]:
+                        severity = 5
+                    else:
+                        severity = 4
 
                 hazards.append({
                     "name": f"{category.title()} hazard — {chunk.section[:60]}",
@@ -184,8 +200,8 @@ def _fallback_hazard_extraction(chunks, process_steps: list[str]) -> list[dict]:
                     "process_step": step,
                     "source_in_process": chunk.section,
                     "likelihood": 3,
-                    "severity": 4 if category == "biological" else 3,
-                    "recommended_control": "Apply CCP monitoring per FSSAI Schedule 4",
+                    "severity": severity,
+                    "recommended_control": f"Apply CCP monitoring per FSSAI {product_category.capitalize()} standards",
                     "ai_confidence": min(chunk.score, 0.85),
                     "citations": [chunk.citation],
                 })
