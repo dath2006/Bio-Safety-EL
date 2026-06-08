@@ -947,6 +947,11 @@ async def get_global_compliance_alerts(db: AsyncSession = Depends(get_db)):
 if __name__ == "__main__":
     import os
     import uvicorn
+    import sys
+    import asyncio
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     reload = os.getenv("AGENT_RELOAD", "false").lower() in ("1", "true", "yes")
 
@@ -955,4 +960,5 @@ if __name__ == "__main__":
         host=settings.agent_host,
         port=settings.agent_port,
         reload=reload,
+        loop="asyncio",
     )

@@ -121,6 +121,25 @@ async def load_plan_state(db: AsyncSession, plan_id: str) -> Optional[HACCPState
     state["monitoring_procedures"] = procedures
     state["corrective_actions"] = actions
     
+    # Merge runtime variables from the checkpointer if available
+    try:
+        from config import get_settings
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from graphs.haccp_graph import build_haccp_graph
+        settings = get_settings()
+        async with AsyncPostgresSaver.from_conn_string(settings.database_url_sync) as checkpointer:
+            await checkpointer.setup()
+            graph = build_haccp_graph(db_session=None, checkpointer=checkpointer)
+            config = {"configurable": {"thread_id": str(plan_id)}}
+            checkpoint_state = await graph.aget_state(config)
+            if checkpoint_state and checkpoint_state.values:
+                for key in ["ccp_candidates", "rag_sources", "messages", "human_decision"]:
+                    if key in checkpoint_state.values:
+                        state[key] = checkpoint_state.values[key]
+    except Exception as e:
+        import sys
+        print(f"Warning: could not merge checkpointer state for plan {plan_id}: {e}", file=sys.stderr)
+
     return state
 
 
@@ -242,10 +261,10 @@ async def save_plan_state(db: AsyncSession, state: HACCPState) -> None:
             cl = limits[ccp_key]
             db.add(CriticalLimit(
                 ccp_id=db_ccp.id,
-                parameter=cl.get("parameter", "Control Parameter"),
+                parameter=cl.get("parameter", "Control Parameter")[:255],
                 min_value=cl.get("min_value"),
                 max_value=cl.get("max_value"),
-                unit=cl.get("unit", ""),
+                unit=cl.get("unit", "")[:255],
                 source_citation=cl.get("source_citation", ""),
                 user_validated=cl.get("user_validated", False)
             ))
@@ -256,9 +275,9 @@ async def save_plan_state(db: AsyncSession, state: HACCPState) -> None:
                 db.add(MonitoringProcedure(
                     ccp_id=db_ccp.id,
                     method=mp.get("method", ""),
-                    frequency=mp.get("frequency", ""),
-                    responsible_person=mp.get("responsible_person", ""),
-                    record_format=mp.get("record_format", "")
+                    frequency=mp.get("frequency", "")[:255],
+                    responsible_person=mp.get("responsible_person", "")[:255],
+                    record_format=mp.get("record_format", "")[:255]
                 ))
                 
         # Add corrective actions
@@ -269,7 +288,7 @@ async def save_plan_state(db: AsyncSession, state: HACCPState) -> None:
                     trigger_condition=ca.get("trigger_condition", ""),
                     immediate_action=ca.get("immediate_action", ""),
                     root_cause_procedure=ca.get("root_cause_procedure", ""),
-                    personnel=ca.get("personnel", "")
+                    personnel=ca.get("personnel", "")[:255]
                 ))
 
     await db.commit()

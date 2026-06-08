@@ -120,12 +120,36 @@ async def limit_fetcher(
             if matching_key:
                 limit_data = limits[matching_key]
 
+        if not isinstance(limit_data, dict):
+            limit_data = {}
+
+        # Safely parse string fields
+        val_param = limit_data.get("parameter")
+        val_unit = limit_data.get("unit")
+        val_citation = limit_data.get("source_citation")
+
+        parameter_str = val_param if isinstance(val_param, str) else "Control Temperature"
+        unit_str = val_unit if isinstance(val_unit, str) else "°C"
+        citation_str = val_citation if isinstance(val_citation, str) else "FSSAI Schedule 4 / GMP guidelines"
+
+        # Safely parse float values
+        def _to_float(v):
+            if v is None:
+                return None
+            try:
+                return float(v)
+            except (ValueError, TypeError):
+                return None
+
+        min_val = _to_float(limit_data.get("min_value"))
+        max_val = _to_float(limit_data.get("max_value"))
+
         record = CriticalLimit(
-            parameter=limit_data.get("parameter", "Control Temperature"),
-            min_value=limit_data.get("min_value"),
-            max_value=limit_data.get("max_value"),
-            unit=limit_data.get("unit", "°C"),
-            source_citation=limit_data.get("source_citation", "FSSAI Schedule 4 / GMP guidelines"),
+            parameter=parameter_str,
+            min_value=min_val,
+            max_value=max_val,
+            unit=unit_str,
+            source_citation=citation_str,
             user_validated=False
         )
         normalized_limits[ccp_key] = record.model_dump()

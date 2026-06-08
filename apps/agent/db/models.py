@@ -180,7 +180,7 @@ class CriticalLimit(Base):
     parameter: Mapped[str] = mapped_column(String(255), nullable=False)
     min_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    unit: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    unit: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     source_citation: Mapped[str] = mapped_column(Text, nullable=False, default="")
     user_validated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
